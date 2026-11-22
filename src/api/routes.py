@@ -9,6 +9,7 @@ from src.memory.chat_history_mongo import ChatHistory
 from src.models.query_request import QueryRequest
 from src.rag.document_upload import documents
 from src.rag.graph_builder import builder
+from src.tools.suggestions import get_followup_questions
 
 router = APIRouter()
 
@@ -16,15 +17,14 @@ router = APIRouter()
 @router.post("/rag/query")
 async def rag_query(req: QueryRequest):
     """
-    Process a RAG query and return the result.
+    Process a RAG query and return the result with follow-up suggestions.
 
     Args:
         req: The query request containing query text and session_id.
 
     Returns:
-        The generated response from the RAG pipeline.
+        The generated response and a list of suggested follow-up questions.
     """
-    #chat_history=ChatInMemoryHistory.get_session_history(req.token)
     chat_history = ChatHistory.get_session_history(req.session_id)
     await chat_history.add_message(HumanMessage(content=req.query))
 
@@ -38,7 +38,10 @@ async def rag_query(req: QueryRequest):
     # Save assistant message
     await chat_history.add_message(AIMessage(content=output_text))
 
-    return {"result": result["messages"][-1]}
+    # Generate follow-up question suggestions
+    suggestions = get_followup_questions(req.query, output_text)
+
+    return {"result": result["messages"][-1], "suggestions": suggestions}
 
 
 @router.post("/rag/documents/upload")
@@ -58,4 +61,3 @@ async def upload_file(
     """
     status_upload = documents(description, file)
     return {"status": status_upload}
-

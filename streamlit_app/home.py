@@ -1,79 +1,29 @@
-"""
-Home page for Streamlit authentication interface.
-"""
-
-import logging
 
 import streamlit as st
+import uuid
 
-from utils.api_client import create_user, login_user, get_api_token
-
-# Hide sidebar for cleaner look
-hide_sidebar_style = """
-    <style>
-        [data-testid="stSidebarNav"] {
-            display: none;
-        }
-    </style>
-"""
-st.markdown(hide_sidebar_style, unsafe_allow_html=True)
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="app.log",
-    filemode="a",
+st.set_page_config(
+    page_title="Adaptive RAG Chatbot",
+    page_icon="🤖",
+    layout="wide"
 )
-logger = logging.getLogger(__name__)
 
-st.set_page_config(page_title="LangGraph Chat - Login")
-
-st.title("🔐 Welcome to LangGraph Assistant")
-
-token = ""
-
-# Step 1: Fetch API token only once per session
+# Create a local session instead of using the missing Rust authentication server
 if "session_id" not in st.session_state:
-    token = get_api_token()
-    if token:
-        st.session_state["session_id"] = token
-        st.success("API token initialized.")
-    else:
-        st.error("Failed to initialize API token.")
-        st.stop()
+    st.session_state["session_id"] = str(uuid.uuid4())
 
-# Step 2: Render login/signup form
-with st.form("auth_form"):
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    mode = st.radio("Choose action:", ["Login", "Create Account"])
-    submit = st.form_submit_button("Submit")
+# The existing chat page uses jwt_token as its session identifier
+if "jwt_token" not in st.session_state:
+    st.session_state["jwt_token"] = st.session_state["session_id"]
 
-# Step 3: Handle login/account creation
-if submit:
-    if not username or not password:
-        st.error("Username and password required.")
-    else:
-        if mode == "Create Account":
-            success = create_user(username, password, st.session_state["session_id"])
-            if success:
-                st.success("User created. Please log in.")
-            else:
-                st.error("User creation failed.")
-        else:
-            response = login_user(username, password, st.session_state["session_id"])
-            if response and response.get("jwt"):
-                st.session_state["jwt_token"] = response["jwt"]
-                st.session_state["username"] = username
-                st.switch_page("pages/Chat.py")
-            else:
-                st.error("Login failed. Downstream API error: Received empty JWT token.")
+st.title("🤖 Adaptive RAG Chatbot")
 
-# Debug logs section
-with st.expander("📜 Debug Logs"):
-    try:
-        with open("app.log", "r") as log_file:
-            st.text(log_file.read())
-    except FileNotFoundError:
-        st.warning("Log file not found yet.")
+st.write(
+    "Welcome! Ask questions, upload documents, "
+    "and interact with your AI-powered RAG assistant."
+)
+
+st.success("Your local session is ready!")
+
+if st.button("Start Chatting", type="primary"):
+    st.switch_page("pages/chat.py")

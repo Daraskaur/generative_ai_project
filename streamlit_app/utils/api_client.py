@@ -156,3 +156,27 @@ def document_upload_rag(file, description: str) -> bool:
             return True
 
     return False
+def query_backend_with_suggestions(query: str, session_id: str):
+    """
+    Send a query to the RAG backend and also get follow-up suggestions.
+
+    Args:
+        query: The user's query text.
+        session_id: Session identifier for tracking conversation.
+
+    Returns:
+        Tuple of (answer text, list of suggested follow-up questions).
+    """
+    url = f"{PYTHON_BASE_URL}/rag/query"
+
+    response = requests.post(
+        url,
+        json={"query": query, "session_id": session_id},
+        allow_redirects=False
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        return data["result"]["content"], data.get("suggestions", [])
+    else:
+        return f"Error: {response.status_code} - {response.text}", []

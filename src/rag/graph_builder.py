@@ -7,11 +7,12 @@ from langchain_core.messages import AIMessage
 from langchain_core.prompts import PromptTemplate
 from langgraph.constants import START, END
 from langgraph.graph.state import StateGraph
+from opentelemetry import context
 
 from src.rag.reAct_agent import agent_executor
 from src.rag.retriever_setup import get_retriever
 from src.config.settings import Config
-from src.llms.openai import llm
+from src.llms.groq import llm
 from src.models.grade import Grade
 from src.models.route_identifier import RouteIdentifier
 from src.models.state import State
@@ -37,17 +38,26 @@ def query_classifier(state: State):
     print("docs received from Qdrant")
     print(context)
 
-    llm_with_structured_output = llm.with_structured_output(RouteIdentifier)
     classify_prompt = PromptTemplate(
         template=config.prompt("classify_prompt"),
         input_variables=["question", "context"]
     )
-    chain = classify_prompt | llm_with_structured_output
-    result = chain.invoke({"question": question, "context": context})
-    print("result received is in query classifier")
-    print(result.route)
+    chain = classify_prompt | llm
+    reply = chain.invoke({"question": question, "context": context})
 
-    return {"messages": state["messages"], "route": result.route, "latest_query": question}
+    # The model replies with a plain word: index, general or search.
+    text = reply.content.strip().lower()
+
+    route = "search"
+    for label in ["index", "general", "search"]:
+        if label in text:
+            route = label
+            break
+
+    print("result received is in query classifier")
+    print(route)
+
+    return {"messages": state["messages"], "route": route, "latest_query": question}
 
 
 def general_llm(state: State):
@@ -68,31 +78,23 @@ def general_llm(state: State):
 
 def retriever_node(state: State):
     """
-    Retrieve results from vector stores using the reAct agent.
+    Retrieve results from the vector store for the current query.
 
     Args:
         state (State): The current state of the graph.
 
     Returns:
-        dict: Updated messages with tool calls.
+        dict: Updated messages containing the retrieved text.
     """
-    messages = state["latest_query"]
-    result = agent_executor.invoke({"input": messages})
+    query = state["latest_query"]
 
-    # Extract tool calls
-    intermediate_steps = result.get("intermediate_steps", [])
-    tool_calls = []
-    if intermediate_steps:
-        for action, tool_result in intermediate_steps:
-            tool_calls.append({
-                "tool": action.tool,
-                "input": action.tool_input,
-            })
+    retriever = get_retriever()
+    context = retriever.invoke(query)
 
-    new_message = AIMessage(
-        content=result["output"],
-        additional_kwargs={"tool_calls": tool_calls},
-    )
+    print("retrieved context from vector store")
+    print(context)
+
+    new_message = AIMessage(content=context)
 
     return {
         "messages": [new_message]
@@ -116,14 +118,15 @@ def grade(state: State):
     context = state["messages"][-1].content
     question = state["latest_query"]
 
-    llm_with_grade = llm.with_structured_output(Grade)
+    chain_graded = grading_prompt | llm
+    reply = chain_graded.invoke({"question": question, "context": context})
 
-    chain_graded = grading_prompt | llm_with_grade
-    result = chain_graded.invoke({"question": question, "context": context})
+    # The model replies with a plain word: yes or no.
+    text = reply.content.strip().lower()
+    binary_score = "yes" if "yes" in text else "no"
 
-    print(result)
-    return {"messages": state["messages"], "binary_score": result.binary_score}
-
+    print(binary_score)
+    return {"messages": state["messages"], "binary_score": binary_score}
 
 def rewrite_query(state: State):
     """
@@ -160,14 +163,15 @@ def generate(state: State):
         dict: Generated response.
     """
     context = state["messages"][-1].content
+    question = state["latest_query"]
 
     generate_prompt = PromptTemplate(
         template=config.prompt("generate_prompt"),
-        input_variables=["context"]
+        input_variables=["question", "context"]
     )
 
     generate_chain = generate_prompt | llm
-    result = generate_chain.invoke({"context": context})
+    result = generate_chain.invoke({"question": question, "context": context})
 
     return {"messages": [{"role": "assistant", "content": result.content}]}
 

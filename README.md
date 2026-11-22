@@ -155,7 +155,6 @@ AdaptiveRag/
 ├── README.md                         # This file
 ├── requirements.txt                  # Python dependencies
 ├── CODE_STYLE_GUIDE.md               # Code formatting standards
-├── QUICK_REFERENCE.md                # Quick reference guide
 ├── README_FORMATTING.md              # Formatting documentation
 ├── VERIFICATION_CHECKLIST.md         # QA verification checklist
 ├── FORMATTING_SUMMARY.md             # Summary of code formatting
@@ -505,11 +504,8 @@ Contributions are welcome! Please follow these steps:
 
 ## 📝 Documentation References
 
-- [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) - Comprehensive coding standards
-- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick patterns and templates
 - [README_FORMATTING.md](README_FORMATTING.md) - Code formatting overview
 - [VERIFICATION_CHECKLIST.md](VERIFICATION_CHECKLIST.md) - QA checklist
-- [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) - Full documentation index
 
 ---
 

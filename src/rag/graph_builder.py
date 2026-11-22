@@ -10,7 +10,8 @@ from langgraph.graph.state import StateGraph
 from opentelemetry import context
 
 from src.rag.reAct_agent import agent_executor
-from src.rag.retriever_setup import get_retriever
+#from src.rag.retriever_setup import get_retriever
+from src.rag.retriever_setup import get_retriever, documents_uploaded
 from src.config.settings import Config
 from src.llms.groq import llm
 from src.models.grade import Grade
@@ -21,10 +22,12 @@ from src.tools.graph_tools import routing_tool, doc_tool
 config = Config()
 
 
-# Node implementations
 def query_classifier(state: State):
     """
-    Classify the query to determine if it's related to indexed documents.
+    Decide how to answer the question.
+
+    Once documents are uploaded, every question is answered only from them.
+    With no documents, the LLM chooses between index, general and search.
 
     Args:
         state (State): The current state of the graph.
@@ -35,30 +38,32 @@ def query_classifier(state: State):
     question = state["messages"][-1].content
     retriever = get_retriever()
     context = retriever.invoke(question)
-    print("docs received from Qdrant")
+    print("docs received from the document store")
     print(context)
 
-    classify_prompt = PromptTemplate(
-        template=config.prompt("classify_prompt"),
-        input_variables=["question", "context"]
-    )
-    chain = classify_prompt | llm
-    reply = chain.invoke({"question": question, "context": context})
+    if documents_uploaded():
+        # Strict mode: answer only from the uploaded documents
+        route = "index"
+    else:
+        classify_prompt = PromptTemplate(
+            template=config.prompt("classify_prompt"),
+            input_variables=["question", "context"]
+        )
+        chain = classify_prompt | llm
+        reply = chain.invoke({"question": question, "context": context})
 
-    # The model replies with a plain word: index, general or search.
-    text = reply.content.strip().lower()
+        # The model replies with a plain word: index, general or search.
+        text = reply.content.strip().lower()
 
-    route = "search"
-    for label in ["index", "general", "search"]:
-        if label in text:
-            route = label
-            break
+        route = "search"
+        for label in ["index", "general", "search"]:
+            if label in text:
+                route = label
+                break
 
-    print("result received is in query classifier")
-    print(route)
+    print("route chosen:", route)
 
     return {"messages": state["messages"], "route": route, "latest_query": question}
-
 
 def general_llm(state: State):
     """
@@ -136,7 +141,7 @@ def rewrite_query(state: State):
         state (State): State of the question.
 
     Returns:
-        dict: Updated latest_query.
+        dict: Updated latest_query and the number of rewrites done.
     """
     query = state["latest_query"]
     rewrite_prompt = PromptTemplate(
@@ -147,10 +152,12 @@ def rewrite_query(state: State):
     result = chain.invoke({"query": query})
     print(result)
 
-    return {
-        "latest_query": result.content
-    }
+    rewrites_done = state.get("rewrite_count") or 0
 
+    return {
+        "latest_query": result.content,
+        "rewrite_count": rewrites_done + 1,
+    }
 
 def generate(state: State):
     """

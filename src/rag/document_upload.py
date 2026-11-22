@@ -28,12 +28,15 @@ def documents(description: str, file: UploadFile = File(...)):
         Boolean indicating success of the upload process.
 
     Raises:
-        HTTPException: If file type is not supported or loading fails.
+        HTTPException: If file type is not supported or any step fails.
     """
+    import traceback
+    from fastapi import HTTPException
+
     filename = file.filename
-    print(filename)
+    print("Upload started for:", filename)
+
     if not filename.endswith(".pdf") and not filename.endswith(".txt"):
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
             detail="Only PDF and TXT files are supported"
@@ -48,42 +51,54 @@ def documents(description: str, file: UploadFile = File(...)):
         tmp_file.write(file_bytes)
         tmp_path = tmp_file.name
 
-    if filename.endswith(".pdf"):
-        loader = PyPDFLoader(tmp_path)
-    else:
-        loader = TextLoader(tmp_path, encoding="utf-8")
-
+    # Step 1: load the file
     try:
+        if filename.endswith(".pdf"):
+            loader = PyPDFLoader(tmp_path)
+        else:
+            loader = TextLoader(tmp_path, encoding="utf-8")
         docs = loader.load()
+
+        # Store the real file name (not the temp file name) so answers can cite it
+        for doc in docs:
+            doc.metadata["source"] = filename
+
+        print("Step 1 OK: file loaded,", len(docs), "pages/sections")
     except Exception as e:
-        from fastapi import HTTPException
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Error loading file: {e}"
+            detail=f"Step 1 failed (loading file): {e}"
         )
     finally:
         os.unlink(tmp_path)
 
-    # Enhance description using LLM
-    description_llm = enhance_description_with_llm(description)
+    # Step 2: improve the description using the LLM
+    try:
+        description_llm = enhance_description_with_llm(description)
+        with open("description.txt", "w", encoding="utf-8") as f:
+            f.write(description_llm)
+        print("Step 2 OK: description saved")
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Step 2 failed (LLM description): {e}"
+        )
 
-    # Save enhanced description
-    with open("description.txt", "w", encoding="utf-8") as f:
-        f.write(description_llm)
-
-    with open("description.txt", "r", encoding="utf-8") as f:
-        print("Document description from storage:")
-        print(f.read())
-
-    # Split documents into chunks
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=150
-    )
-    chunks = splitter.split_documents(docs)
-
-    return retriever_chain(chunks)
-
-
-
+    # Step 3: split into chunks and store in the vector database
+    try:
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=150
+        )
+        chunks = splitter.split_documents(docs)
+        print("Step 3 OK:", len(chunks), "chunks created")
+        return retriever_chain(chunks)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Step 3 failed (chunking/storing): {e}"
+        )
 

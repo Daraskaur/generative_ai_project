@@ -9,6 +9,7 @@ from src.memory.chat_history_mongo import ChatHistory
 from src.models.query_request import QueryRequest
 from src.rag.document_upload import documents
 from src.rag.graph_builder import builder
+from src.tools.citations import build_citation_footer
 from src.tools.suggestions import get_followup_questions
 
 router = APIRouter()
@@ -37,6 +38,10 @@ async def rag_query(req: QueryRequest):
 
     # Save assistant message
     await chat_history.add_message(AIMessage(content=output_text))
+
+    # Add "Sources" under the answer the user sees. The chat history saved
+    # above keeps the plain answer without this footer.
+    result["messages"][-1].content = output_text + build_citation_footer(result)
 
     # Generate follow-up question suggestions
     suggestions = get_followup_questions(req.query, output_text)

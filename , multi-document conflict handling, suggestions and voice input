@@ -1,0 +1,19 @@
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/api/routes.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/config/prompts.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/models/state.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/rag/document_upload.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/rag/graph_builder.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/rag/retriever_setup.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/tools/graph_tools.py', LF will be replaced by CRLF the next time Git touches it
+ .gitignore                 |   1 [32m+[m
+ README.md                  |   4 [31m-[m
+ src/api/routes.py          |   5 [32m++[m
+ src/config/prompts.yaml    |  32 [32m++++++[m[31m--[m
+ src/models/state.py        |   1 [32m+[m
+ src/rag/document_upload.py |  53 [32m++++++++[m[31m-----[m
+ src/rag/graph_builder.py   |  27 [32m++++[m[31m---[m
+ src/rag/retriever_setup.py | 185 [32m++++++++++++++++++++++++++++++[m[31m---------------[m
+ src/tools/graph_tools.py   |  16 [32m++[m[31m--[m
+ 9 files changed, 217 insertions(+), 107 deletions(-)

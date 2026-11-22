@@ -31,24 +31,26 @@ def routing_tool(state: State) -> Literal["retriever", "general_llm", "web_searc
     else:
         return "web_search"
 
-
 def doc_tool(state: State) -> Literal["rewrite", "generate"]:
     """
-    Determine whether the query needs rewriting based on grading score.
+    Decide whether to rewrite the query or write the answer.
+
+    The query is rewritten at most once. If the documents still do not
+    match after that, the answer step runs and reports "not found".
 
     Args:
         state (State): The current state of the graph.
 
     Returns:
-        The next node: "generate" if score is "yes", otherwise "rewrite".
+        The next node: "generate" or "rewrite".
     """
     score = state["binary_score"]
-    print(f"[doc_tool] Routing based on score: {score}")
-    if score == "yes":
-        return "generate"
-    else:
-        return "rewrite"
+    rewrites_done = state.get("rewrite_count") or 0
+    print(f"[doc_tool] score: {score}, rewrites done: {rewrites_done}")
 
+    if score == "yes" or rewrites_done >= 1:
+        return "generate"
+    return "rewrite"
 
 def verify_answer(state: State) -> Literal["__end__", "generate"]:
     """
